@@ -37,7 +37,7 @@ async function getAccessToken(code) {
         code: code,
         client_id: process.env.CLIENT_ID,
         client_secret: process.env.CLIENT_SECRET,
-        redirect_uri: 'https://richardsgottatest.au.ngrok.io/slack-img', // Must match if we send one from `/slack/install/`. If we don't then the app config page will automatically redirect
+        redirect_uri: 'https://richardsgottatest.au.ngrok.io/authenticate', // Must match if we send one from `/slack/install/`. If we don't then the app config page will automatically redirect
       });
     console.log(response.body);
     return response.body.authed_user.id;
@@ -46,8 +46,22 @@ async function getAccessToken(code) {
   }
 }
 
+async function chatPostEphemeral(channel, user, message) {
+  const httpHeaders = {
+    'Content-type': 'application/json; charset=utf-8',
+    Authorization: `Bearer ${process.env.BOT_TOKEN}`,
+  };
+  const response = await request.post('https://slack.com/api/chat.postEphemeral').set(httpHeaders).send({
+    channel: channel,
+    user: user,
+    blocks: message,
+  });
+  return response;
+}
+
 module.exports = {
   filesRemoteAdd,
   chatUnfurl,
   getAccessToken,
+  chatPostEphemeral,
 };

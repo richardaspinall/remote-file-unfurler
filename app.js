@@ -3,7 +3,8 @@ const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const verifySignature = require('./verifySignature.js');
-const { filesRemoteAdd, chatUnfurl, getAccessToken } = require('./slack-api');
+const { filesRemoteAdd, chatUnfurl, getAccessToken, chatPostEphemeral } = require('./slack-api');
+const createMessage = require('./createMessage');
 
 const app = express();
 
@@ -13,7 +14,7 @@ app.use(express.json({ verify: verifySignature }));
 app.use(express.static('public'));
 
 app.use(
-  ['/slack-img', '/private-resource'],
+  ['/slack-img', '/private-resource', '/authenticate'],
   session({
     secret: process.env.SESSION_SECRET,
     resave: false,
@@ -24,6 +25,8 @@ app.use(
 
 // Resource URL
 const RESOURCE_URL = `${process.env.UNFURL_DOMAIN}/slack-img`;
+
+const AUTHED_USERS = [''];
 
 app.post('/slack/events', async (req, res) => {
   // Verify request signature is valid
@@ -40,16 +43,81 @@ app.post('/slack/events', async (req, res) => {
   res.sendStatus(200);
 
   const channel = req.body.event.channel;
+  const user = req.body.event.user;
   const message_ts = req.body.event.message_ts;
+  const url = req.body.event.links[0].url;
 
-  // TODO: add identity check in Slack
+  const authedUser = AUTHED_USERS.find(function (userToFind) {
+    return userToFind === user;
+  });
 
-  // Check URL in message matches the resource URL
-  if (req.body.event.links[0].url === RESOURCE_URL) {
+  if (!authedUser) {
+    console.log('Not Authed');
+    const response = await chatPostEphemeral(channel, user, createMessage(channel, message_ts, url));
+    console.log(response.body);
+    return;
+  }
+
+  unfurlImage(url, channel, message_ts);
+});
+
+app.get('/authenticate', async (req, res) => {
+  let state = {};
+  if (req.query.url && req.query.channel && req.query.message_ts) {
+    state = encodeURIComponent(
+      JSON.stringify({ url: req.query.url, channel: req.query.channel, message_ts: req.query.message_ts })
+    );
+  }
+
+  if (req.query.code) {
+    // Send the code to ask for an access token and display it back on redirect
+    req.session.user = await getAccessToken(req.query.code);
+    AUTHED_USERS.push(req.session.user);
+    // TODO: if state includes message_ts, channel and url, unfurl image
+
+    state = JSON.parse(decodeURIComponent(req.query.state));
+    if (state.channel) {
+      unfurlImage(state.url, state.channel, state.message_ts);
+    }
+    res.redirect('/slack-img');
+    return;
+  }
+  res.send(
+    `<a href="https://slack.com/oauth/v2/authorize?user_scope=identity.basic&client_id=${process.env.CLIENT_ID}&state=${state}&redirect_uri=https://richardsgottatest.au.ngrok.io/authenticate"><img src="https://api.slack.com/img/sign_in_with_slack.png" /></a>`
+  );
+});
+
+app.get('/slack-img', async (req, res) => {
+  if (!req.session.user) {
+    res.redirect('/authenticate');
+    return;
+  }
+  res.send(`<img style="display: block; width:50%; margin-left:auto; margin-right:auto" src="/private-resource">`);
+});
+
+app.get('/private-resource', (req, res) => {
+  if (req.session && req.session.user) {
+    res.sendFile(path.join(__dirname, './private/slack.jpg'), function (err) {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log('Sent file');
+      }
+    });
+  } else {
+    res.sendStatus(404);
+  }
+});
+app.listen(3000, () => {
+  console.log('Server has started');
+});
+
+async function unfurlImage(url, channel, message_ts) {
+  if (url === RESOURCE_URL) {
     try {
       // Add preview image to Slack
       const response = await filesRemoteAdd(
-        path.join(__dirname, './public/slack.jpg'),
+        path.join(__dirname, './private/slack.jpg'),
         'Slack Logo',
         RESOURCE_URL,
         'ABC123456789'
@@ -73,38 +141,4 @@ app.post('/slack/events', async (req, res) => {
       console.error(err);
     }
   }
-});
-
-app.get('/slack-img', async (req, res) => {
-  if (req.query.code) {
-    // Send the code and res off to ask for an access token and display it back on redirect
-    req.session.user = await getAccessToken(req.query.code);
-    res.redirect('/slack-img');
-    return;
-  } else if (!req.session.user) {
-    res.send(
-      `<a href="https://slack.com/oauth/v2/authorize?user_scope=identity.basic&client_id=${process.env.CLIENT_ID}&redirect_uri=https://richardsgottatest.au.ngrok.io/slack-img"><img src="https://api.slack.com/img/sign_in_with_slack.png" /></a>`
-    );
-  }
-  if (req.session.user) {
-    console.log(req.session);
-    res.send(`<img style="display: block; width:50%; margin-left:auto; margin-right:auto" src="/private-resource">`);
-  }
-});
-
-app.get('/private-resource', (req, res) => {
-  if (req.session && req.session.user) {
-    res.sendFile(path.join(__dirname, './private/slack.jpg'), function (err) {
-      if (err) {
-        console.log(err);
-      } else {
-        console.log('Sent file');
-      }
-    });
-  } else {
-    res.sendStatus(404);
-  }
-});
-app.listen(3000, () => {
-  console.log('Server has started');
-});
+}
