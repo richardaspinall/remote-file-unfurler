@@ -3,8 +3,9 @@ const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const verifySignature = require('./verifySignature.js');
-const { filesRemoteAdd, chatUnfurl, getAccessToken, chatPostEphemeral } = require('./slack-api');
+const { getAccessToken, chatPostEphemeral } = require('./slack-api');
 const createMessage = require('./createMessage');
+const unfurlImage = require('./unfurlImage');
 
 const app = express();
 
@@ -22,9 +23,6 @@ app.use(
     cookie: { maxAge: 60000 },
   })
 );
-
-// Resource URL
-const RESOURCE_URL = `${process.env.UNFURL_DOMAIN}/slack-img`;
 
 const AUTHED_USERS = [''];
 
@@ -111,34 +109,3 @@ app.get('/private-resource', (req, res) => {
 app.listen(3000, () => {
   console.log('Server has started');
 });
-
-async function unfurlImage(url, channel, message_ts) {
-  if (url === RESOURCE_URL) {
-    try {
-      // Add preview image to Slack
-      const response = await filesRemoteAdd(
-        path.join(__dirname, './private/slack.jpg'),
-        'Slack Logo',
-        RESOURCE_URL,
-        'ABC123456789'
-      );
-
-      if (response.body.ok) {
-        // Unfurl preview image
-        chatUnfurl(message_ts, channel, {
-          [RESOURCE_URL]: {
-            blocks: [
-              {
-                type: 'file',
-                external_id: 'ABC123456789',
-                source: 'remote',
-              },
-            ],
-          },
-        });
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }
-}
