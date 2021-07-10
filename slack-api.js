@@ -37,7 +37,7 @@ async function getAccessToken(code) {
         code: code,
         client_id: process.env.CLIENT_ID,
         client_secret: process.env.CLIENT_SECRET,
-        redirect_uri: 'https://richardsgottatest.au.ngrok.io/authenticate', // Must match if we send one from `/slack/install/`. If we don't then the app config page will automatically redirect
+        redirect_uri: 'https://richardsgottatest.au.ngrok.io/login/oauth_redirect', // Must match if we send one from `/slack/install/`. If we don't then the app config page will automatically redirect
       });
     console.log(response.body);
     return response.body.authed_user.id;
