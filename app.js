@@ -4,7 +4,7 @@ const express = require('express');
 const session = require('express-session');
 
 const verifySignature = require('./verifySignature.js');
-const { getAccessToken, chatPostEphemeral } = require('./slack-api');
+const { getAccessToken, chatPostEphemeral, deletePostEphemeral } = require('./slack-api');
 const createMessage = require('./createMessage');
 const unfurlImage = require('./unfurlImage');
 
@@ -25,6 +25,7 @@ app.use(
   })
 );
 
+// Storing session in an array (should be a DB)
 const AUTHED_USERS = [''];
 
 app.post('/slack/events', async (req, res) => {
@@ -41,23 +42,37 @@ app.post('/slack/events', async (req, res) => {
   // Acknowledge event
   res.sendStatus(200);
 
-  const channel = req.body.event.channel;
-  const user = req.body.event.user;
-  const message_ts = req.body.event.message_ts;
-  const url = req.body.event.links[0].url;
+  if (req.body.event && req.body.event.type === 'link_shared') {
+    const channel = req.body.event.channel;
+    const user = req.body.event.user;
+    const message_ts = req.body.event.message_ts;
+    const url = req.body.event.links[0].url;
 
-  const authedUser = AUTHED_USERS.find(function (userToFind) {
-    return userToFind === user;
-  });
+    const authedUser = AUTHED_USERS.find(function (userToFind) {
+      return userToFind === user;
+    });
 
-  if (!authedUser) {
-    console.log('Not Authed');
-    const response = await chatPostEphemeral(channel, user, createMessage(channel, message_ts, url));
-    console.log(response.body);
-    return;
+    if (!authedUser) {
+      console.log('Not Authed');
+      const response = await chatPostEphemeral(channel, user, createMessage(channel, message_ts, url));
+      console.log(response.body);
+      return;
+    }
+
+    unfurlImage(url, channel, message_ts);
   }
+});
 
-  unfurlImage(url, channel, message_ts);
+app.post('/slack/interactivity', (req, res) => {
+  if (!req.valid) {
+    return res.sendStatus(404);
+  }
+  res.sendStatus(200);
+
+  const body = JSON.parse(req.body.payload);
+
+  // Deleting ephemeral message to make more tidy (this will happen regardless of whether they auth or not)
+  deletePostEphemeral(body.response_url);
 });
 
 // Sign in with slack
@@ -95,9 +110,12 @@ app.get('/login/oauth_redirect', async (req, res) => {
     // Store user (global var – will be cleared on server close)
     // Should store to DB but not purpose of this app
     AUTHED_USERS.push(req.session.user);
-    // Unfurl image in Slack if user initially shared a link
+
+    // Unfurl image in Slack if user initially shared a link and redirect them back
     if (state.url) {
       unfurlImage(state.url, state.channel, state.message_ts);
+      res.redirect(`https://slack.com/app_redirect?channel=${state.channel}`);
+      return;
     }
     // Redirect user to the private resource
     res.redirect('/slack-img');
@@ -112,7 +130,14 @@ app.get('/slack-img', async (req, res) => {
     res.redirect('/login');
     return;
   }
-  res.send(`<img style="display: block; width:50%; margin-left:auto; margin-right:auto" src="/slack-img/slack.jpg">`);
+  res.send(
+    `<img style="display: block; width:50%; margin-top: 200px; margin-left:auto; margin-right:auto" src="/slack-img/slack.jpg">
+    <h1>Confidential text</h1>
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+    `
+  );
 });
 
 app.get('/slack-img/slack.jpg', (req, res) => {

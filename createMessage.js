@@ -18,7 +18,7 @@ module.exports = function createMessage(channel, message_ts, url) {
             emoji: true,
           },
           style: 'primary',
-          value: 'click_me_123',
+          value: 'connect_account',
           action_id: 'actionId-0',
           url: `${process.env.UNFURL_DOMAIN}/login?channel=${channel}&message_ts=${message_ts}&url=${url}`,
         },

@@ -59,9 +59,20 @@ async function chatPostEphemeral(channel, user, message) {
   return response;
 }
 
+async function deletePostEphemeral(url) {
+  const httpHeaders = {
+    'Content-type': 'application/json; charset=utf-8',
+  };
+  const response = await request.post(url).set(httpHeaders).send({
+    delete_original: 'true',
+  });
+  return response;
+}
+
 module.exports = {
   filesRemoteAdd,
   chatUnfurl,
   getAccessToken,
   chatPostEphemeral,
+  deletePostEphemeral,
 };
