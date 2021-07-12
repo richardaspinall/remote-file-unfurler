@@ -25,8 +25,8 @@ app.use(
   })
 );
 
-// Storing session in an array (should be a DB)
-const AUTHED_USERS = [''];
+// Not saving to DB, state reset on server restart
+const AUTHED_USERS = new Set();
 
 app.post('/slack/events', async (req, res) => {
   // Verify request signature is valid
@@ -48,9 +48,7 @@ app.post('/slack/events', async (req, res) => {
     const message_ts = req.body.event.message_ts;
     const url = req.body.event.links[0].url;
 
-    const authedUser = AUTHED_USERS.find(function (userToFind) {
-      return userToFind === user;
-    });
+    const authedUser = AUTHED_USERS.has(user);
 
     if (!authedUser) {
       console.log('Not Authed');
@@ -109,7 +107,7 @@ app.get('/login/oauth_redirect', async (req, res) => {
 
     // Store user (global var – will be cleared on server close)
     // Should store to DB but not purpose of this app
-    AUTHED_USERS.push(req.session.user);
+    AUTHED_USERS.add(req.session.user);
 
     // Unfurl image in Slack if user initially shared a link and redirect them back
     if (state.url) {
