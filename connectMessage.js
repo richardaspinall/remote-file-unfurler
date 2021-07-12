@@ -1,4 +1,4 @@
-module.exports = function createMessage(channel, message_ts, url) {
+module.exports = function connectMessage(channel, message_ts, url) {
   return [
     {
       type: 'section',

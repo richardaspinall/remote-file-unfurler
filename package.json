@@ -4,7 +4,7 @@
   "description": "Slack tester app that displays a file preview when a link is shared by authed user",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon app.js"
+    "start": "nodemon server.js"
   },
   "repository": {
     "type": "git",

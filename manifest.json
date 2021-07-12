@@ -1,0 +1,42 @@
+{
+  "_metadata": {
+    "major_version": 1,
+    "minor_version": 1
+  },
+  "display_information": {
+    "name": "breakdown-unfurling",
+    "description": "App for breaking down unfurls",
+    "background_color": "#2e2e30"
+  },
+  "features": {
+    "app_home": {
+      "home_tab_enabled": true,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    },
+    "bot_user": {
+      "display_name": "breakdown-unfurling",
+      "always_online": false
+    },
+    "unfurl_domains": ["UNFURL_DOMAIN"]
+  },
+  "oauth_config": {
+    "redirect_urls": ["UNFURL_DOMAIN/"],
+    "scopes": {
+      "user": ["identity.basic"],
+      "bot": ["links:read", "links:write", "remote_files:write", "chat:write"]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "UNFURL_DOMAIN/slack/events",
+      "bot_events": ["link_shared"]
+    },
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "UNFURL_DOMAIN/slack/interactivity"
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false
+  }
+}
